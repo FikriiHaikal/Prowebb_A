@@ -1,125 +1,97 @@
-import React, { useEffect, useState } from "react";
-import axios from "axios";
-import "bootstrap/dist/css/bootstrap.min.css";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrash, faEdit } from "@fortawesome/free-solid-svg-icons";
+const express = require("express");
+const { Pool } = require("pg");
+const cors = require("cors");
 
-function ProdukList() {
-  const [produk, setProduk] = useState([]);
-  const [selectedProduk, setSelectedProduk] = useState(null);
-  const [newNama, setNewNama] = useState("");
-  const [newHarga, setNewHarga] = useState("");
+const app = express();
+const port = 3001;
 
-  useEffect(() => {
-    axios
-      .get("http://localhost:3001/produk")
-      .then((response) => setProduk(response.data))
-      .catch((error) => console.error(error));
-  }, []);
+// Middleware
+app.use(cors());
+app.use(express.json());
 
-  const handleDelete = (id) => {
-    axios
-      .delete(`http://localhost:3001/produk/${id}`)
-      .then(() => {
-        setProduk(produk.filter((p) => p.id !== id));
-      })
-      .catch((err) => console.error(err));
-  };
+// Konfigurasi koneksi ke PostgreSQL
+const pool = new Pool({
+  user: "postgres",
+  host: "localhost",
+  database: "ecommerce-kecil",
+  password: "1",
+  port: 5432,
+});
 
-  const handleEdit = (produk) => {
-    setSelectedProduk(produk);
-    setNewNama(produk.nama);
-    setNewHarga(produk.harga);
-  };
+// Endpoint GET /produk (Ambil semua produk)
+app.get("/produk", async (req, res) => {
+  try {
+    const result = await pool.query("SELECT * FROM produk");
+    res.json(result.rows);
+  } catch (error) {
+    console.error("Error mengambil data:", error);
+    res.status(500).json({ error: "Terjadi kesalahan saat mengambil data" });
+  }
+});
 
-  const handleUpdate = () => {
-    axios
-      .put(`http://localhost:3001/produk/${selectedProduk.id}`, {
-        nama: newNama,
-        harga: newHarga,
-      })
-      .then((response) => {
-        setProduk(
-          produk.map((p) => (p.id === selectedProduk.id ? response.data.data : p))
-        );
-        setSelectedProduk(null);
-      })
-      .catch((err) => console.error(err));
-  };
+// Endpoint POST /produk (Tambah Produk)
+app.post("/produk", async (req, res) => {
+  try {
+    const { nama, harga } = req.body;
 
-  return (
-    <div className="container mt-4">
-      <h2 className="text-center mb-4 fw-bold">Daftar Produk</h2>
-      <div className="row">
-        {produk.map((item) => (
-          <div key={item.id} className="col-md-4 mb-4">
-            <div className="card shadow-lg border-0 rounded-lg">
-              <div className="card-body text-center">
-                <h5 className="card-title fw-bold">{item.nama}</h5>
-                <p className="card-text text-primary fs-5">Rp{item.harga}</p>
-                <div className="d-flex justify-content-center">
-                  <button
-                    className="btn btn-sm btn-warning me-2"
-                    onClick={() => handleEdit(item)}
-                    data-bs-toggle="modal"
-                    data-bs-target="#editModal"
-                  >
-                    <FontAwesomeIcon icon={faEdit} /> Edit
-                  </button>
-                  <button
-                    className="btn btn-sm btn-danger"
-                    onClick={() => handleDelete(item.id)}
-                  >
-                    <FontAwesomeIcon icon={faTrash} /> Hapus
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        ))}
-      </div>
+    // Validasi input
+    if (!nama || !harga) {
+      return res.status(400).json({ error: "Nama dan Harga wajib diisi" });
+    }
 
-      {/* Modal Edit Produk */}
-      {selectedProduk && (
-        <div className="modal fade" id="editModal" tabIndex="-1">
-          <div className="modal-dialog">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Edit Produk</h5>
-                <button type="button" className="btn-close" data-bs-dismiss="modal"></button>
-              </div>
-              <div className="modal-body">
-                <div className="mb-3">
-                  <label className="form-label">Nama Produk</label>
-                  <input
-                    type="text"
-                    className="form-control"
-                    value={newNama}
-                    onChange={(e) => setNewNama(e.target.value)}
-                  />
-                </div>
-                <div className="mb-3">
-                  <label className="form-label">Harga</label>
-                  <input
-                    type="number"
-                    className="form-control"
-                    value={newHarga}
-                    onChange={(e) => setNewHarga(e.target.value)}
-                  />
-                </div>
-              </div>
-              <div className="modal-footer">
-                <button className="btn btn-secondary" data-bs-dismiss="modal">Batal</button>
-                <button className="btn btn-success" onClick={handleUpdate} data-bs-dismiss="modal">
-                  Simpan Perubahan
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-    </div>
-  );
-}
+    // Query untuk menambahkan data ke database
+    const result = await pool.query(
+      "INSERT INTO produk (nama, harga) VALUES ($1, $2) RETURNING *",
+      [nama, harga]
+    );
 
-export default ProdukList;
+    res.status(201).json({ message: "Produk berhasil ditambah", data: result.rows[0] });
+  } catch (error) {
+    console.error("Error menambahkan produk:", error);
+    res.status(500).json({ error: "Terjadi kesalahan saat menambahkan produk" });
+  }
+});
+
+// Endpoint PUT /produk/:id (Update Produk)
+app.put("/produk/:id", async (req, res) => {
+  const { id } = req.params;
+  const { nama, harga } = req.body;
+
+  try {
+    const updateProduk = await pool.query(
+      "UPDATE produk SET nama = $1, harga = $2 WHERE id = $3 RETURNING *",
+      [nama, harga, id]
+    );
+
+    if (updateProduk.rowCount === 0) {
+      return res.status(404).json({ error: "Produk tidak ditemukan" });
+    }
+
+    res.json({ message: "Produk berhasil diperbarui", data: updateProduk.rows[0] });
+  } catch (err) {
+    console.error("Error saat memperbarui produk:", err);
+    res.status(500).json({ error: "Terjadi kesalahan saat memperbarui produk" });
+  }
+});
+
+// Endpoint DELETE /produk/:id (Hapus Produk)
+app.delete("/produk/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const deleteProduk = await pool.query("DELETE FROM produk WHERE id = $1", [id]);
+
+    if (deleteProduk.rowCount === 0) {
+      return res.status(404).json({ error: "Produk tidak ditemukan" });
+    }
+
+    res.json({ message: "Produk berhasil dihapus" });
+  } catch (err) {
+    console.error("Error saat menghapus produk:", err);
+    res.status(500).json({ error: "Terjadi kesalahan saat menghapus produk" });
+  }
+});
+
+// Jalankan server
+app.listen(port, () => {
+  console.log(`Server berjalan di http://localhost:${port}`);
+});
