@@ -1,57 +1,75 @@
-// src/components/TambahProduk.jsx
-import React, { useState } from 'react';
-import axios from 'axios';
+import React, { useState } from "react";
+import axios from "axios";
+import { Button, Modal, Form, Alert } from "react-bootstrap";
 
 function TambahProduk() {
-  const [nama, setNama] = useState('');
-  const [harga, setHarga] = useState('');
-  const [error, setError] = useState('');
+  const [show, setShow] = useState(false);
+  const [nama, setNama] = useState("");
+  const [harga, setHarga] = useState("");
+  const [error, setError] = useState("");
 
   const handleSubmit = (e) => {
     e.preventDefault();
-
-    // Validasi input
     if (!nama || !harga) {
-      setError('Nama dan Harga wajib diisi');
+      setError("Nama dan Harga wajib diisi!");
       return;
     }
-    setError('');
+    setError("");
 
-    axios.post('http://localhost:3001/produk', { nama, harga })
+    axios
+      .post("http://localhost:3001/produk", { nama, harga })
       .then((res) => {
-        console.log('Produk berhasil ditambah:', res.data);
-        setNama('');
-        setHarga('');
+        console.log("Produk berhasil ditambah:", res.data);
+        setNama("");
+        setHarga("");
+        setShow(false);
       })
-      .catch((err) => {
-        console.error('Error menambah produk:', err);
-      });
+      .catch((err) => console.error("Error menambah produk:", err));
   };
 
   return (
-    <div>
-      <h2>Tambah Produk</h2>
-      {error && <p style={{ color: 'red' }}>{error}</p>}
-      <form onSubmit={handleSubmit}>
-        <div>
-          <label>Nama Produk: </label>
-          <input
-            type="text"
-            value={nama}
-            onChange={(e) => setNama(e.target.value)}
-          />
-        </div>
-        <div>
-          <label>Harga: </label>
-          <input
-            type="number"
-            value={harga}
-            onChange={(e) => setHarga(e.target.value)}
-          />
-        </div>
-        <button type="submit">Simpan</button>
-      </form>
-    </div>
+    <>
+      <div className="text-center mb-3">
+        <Button variant="success" onClick={() => setShow(true)}>
+          + Tambah Produk
+        </Button>
+      </div>
+
+      <Modal show={show} onHide={() => setShow(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Tambah Produk</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {error && <Alert variant="danger">{error}</Alert>}
+          <Form onSubmit={handleSubmit}>
+            <Form.Group className="mb-3">
+              <Form.Label>Nama Produk</Form.Label>
+              <Form.Control
+                type="text"
+                value={nama}
+                onChange={(e) => setNama(e.target.value)}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Harga Produk</Form.Label>
+              <Form.Control
+                type="number"
+                value={harga}
+                onChange={(e) => setHarga(e.target.value)}
+              />
+            </Form.Group>
+            <div className="text-end">
+              <Button variant="secondary" onClick={() => setShow(false)}>
+                Batal
+              </Button>
+              <Button variant="primary" type="submit" className="ms-2">
+                Simpan
+              </Button>
+            </div>
+          </Form>
+        </Modal.Body>
+      </Modal>
+    </>
   );
 }
 
